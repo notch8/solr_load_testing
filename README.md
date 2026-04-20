@@ -1,83 +1,98 @@
 ## Instructions for developing tests
+
 1. Install jmeter
 ```bash
-brew install jmeter 
+brew install jmeter
 ```
 1. Start jmeter - this will open the GUI, which should only be used when building or editing tests, not when actually load testing.
 ```bash
 jmeter
 ```
-1. From the GUI, select File > Open then browse to the test plan you want to work on (.e.g. `solr_test_plan.jmx`)
+1. From the GUI, select File > Open then browse to the test plan you want to work on (e.g. `solr_test_plan.jmx`)
 1. You may need to press the "plus" buttons to the left of the headers to see the full plan.
-1. Go to the User Defined Variables under the top-level "Solr test plan" and make sure the variables match the environment you want to work against (see [User Defined Variables by Environment below](#user-defined-variables-by-environment))
+1. Go to the User Defined Variables under the top-level "Solr test plan" and make sure the variables match the environment you want to work against.
 1. In order to run the current test plan, click the green arrow button.
 
-## Running from loadtest1.lib.princeton.edu
-* Ensure the User Defined Variables in the Solr test plan are correct and saved for the environment (see [User Defined Variables by Environment below](#user-defined-variables-by-environment))
-* This project is checked out at `/home/deploy/solr_load_testing`
-* You can make changes locally, commit and push them to a branch, then check that branch out on the server
+## Running via Kubernetes
 
-* SSH onto the box
-```bash
-ssh deploy@loadtest1.lib.princeton.edu
-```
-* Run the jmeter test from loadtest1.lib.princeton.edu
-```bash
-# To test reads:
-jmeter -n -t /home/deploy/solr_load_testing/solr_test_plan.jmx -e -l /home/deploy/solr_load_testing/test_report-$(date +"%Y-%m-%d:%H:%M:%S").jtl -o /home/deploy/solr_tests/test_results-$(date +"%Y-%m-%d:%H:%M:%S")/
-# To test writes:
-JVM_ARGS="-Xms2048m -Xmx2048m" jmeter -n -t /home/deploy/solr_load_testing/solr_write_test_plan.jmx -e -l /home/deploy/solr_load_testing/write_test_report-$(date +"%Y-%m-%d:%H:%M:%S").jtl -o /home/deploy/solr_tests/write_test_results-$(date +"%Y-%m-%d:%H:%M:%S")/
-# To test facet.contains queries:
-jmeter -n -t /home/deploy/solr_load_testing/solr_facet_contains_test_plan.jmx -e -l /home/deploy/solr_load_testing/facet_contains_test_report-$(date +"%Y-%m-%d:%H:%M:%S").jtl -o /home/deploy/solr_tests/facet_contains_test_results-$(date +"%Y-%m-%d:%H:%M:%S")/
-```
-* Look at the results on the web at [loadtest.lib.princeton.edu/solr_tests/](https://loadtest.lib.princeton.edu/solr_tests/) (VPN required)
-## User Defined Variables by Environment
-### Development
-```
-host orangelight.dev.solr.lndo.site
-port 80
-solr_core orangelight-core-dev
-kw_expected_result_count 1
-sitemap_expected_result_count 255
-keyword_file_full_path [full path to this repo + /keywords.csv]
-```
-### From loadtest1.lib.princeton.edu - against Staging
-```
-host lib-solr8d-staging.princeton.edu
-port 8983
-solr_core catalog-performance (for read test) or catalog-write-performance (for write test)
-kw_expected_result_count 12941
-sitemap_expected_result_count 18170086
-keyword_file_full_path /home/deploy/keywords.csv
+This is the preferred approach for repeatable tests, as it runs JMeter inside the cluster
+alongside Solr, eliminating network variance.
+
+### Prerequisites
+
+- `kubectl` configured with access to the target cluster
+- `kustomize` (or `kubectl` v1.14+, which includes kustomize support via `-k`)
+
+### Configuration
+
+The Job is configured to run against Solr at `solr.solr.svc.cluster.local:8983`. The only
+value likely to need changing between runs is `solr_core` in `k8s/job.yaml`.
+
+### Running a test
+
+```zsh
+kubectl apply -k . --context <your-cluster>
 ```
 
-### Generate HTML report
-1. Run the test using the CLI mode
-1. Once the test has completed, open the JMeter GUI
-1. Find where your user.properties file is for your install of JMeter
-  * I used Homebrew to install locally, so to find the actual location, I did:
-  ```bash
-  ➜  ~ brew --prefix jmeter
-/opt/homebrew/opt/jmeter
-➜  ~ ls -la /opt/homebrew/opt/jmeter
-lrwxr-xr-x  1 kadelm  admin  20 May 30 09:28 /opt/homebrew/opt/jmeter -> ../Cellar/jmeter/5.6.3
-  ```
-  * For homebrew installs, the `user.properties` file is in the symlinked directory, under `/opt/homebrew/Cellar/jmeter/5.6.3/libexec/bin/user.properties`
-1. In JMeter, go to Tools > Generate HTML report
-  1. For "Results file" Select the newly created `test_results/simple_data_writer.csv` file
-  1. For "user.properties file" put in the path you found above
-  1. For "Output directory" create an empty directory
-  1. Click "Generate report"
-1. Open the generated index.html file using your browser
+### Retrieving results
 
-### Record the trial in the spreadsheet
-Record what experiment you did, and a link to the report that was generated, in [this spreadsheet](https://docs.google.com/spreadsheets/d/1zvbCHYgnx0KFNtwVmNV6-yHDJN84kIRKbO5YvywiYFk/edit?usp=sharing).
+Once the Job completes, copy the results to your local machine:
+
+```zsh
+RESULTS_POD=$(kubectl get pods -n load-testing --context <your-cluster> -l job-name=jmeter-solr-load-test -o jsonpath='{.items[0].metadata.name}')
+kubectl cp --context <your-cluster> -n load-testing ${RESULTS_POD}:/results ./results
+```
+
+The `./results` directory will contain:
+- `test-report.jtl` — raw results data
+- `html-report/` — open `html-report/index.html` in a browser to view the dashboard
+
+### Re-running a test
+
+Kubernetes Jobs are immutable once created.
+
+If you want to re-run the job without changing any variables, run:
+
+```zsh
+kubectl get job jmeter-solr-load-test -n load-testing --context <your-cluster> -o yaml \
+  | kubectl replace --force -f -
+```
+
+If you have changed the specs, before re-running, delete the existing Job:
+
+```zsh
+kubectl delete job jmeter-solr-load-test -n load-testing --context <your-cluster>
+```
+
+Then apply again:
+
+```zsh
+kubectl apply -k . --context <your-cluster>
+```
 
 ## Tips on planning a useful test
 
-* When we deploy a new solr configuration with `pul_solr`, it clears the solr caches (Filter Cache, Query Cache, etc).  If you want to compare two different configurations, make sure to deploy them both fresh before running your test (unless your test is specifically investigating what happens with a full cache).
+* When a new Solr configuration is deployed, it clears the Solr caches (Filter Cache, Query
+Cache, etc). If you want to compare two different configurations, make sure to deploy them
+both fresh before running your test (unless your test is specifically investigating what
+happens with a full cache).
+
+* To ensure Solr caches are cleared before a test, perform a rolling restart:
+
+```zsh
+kubectl rollout restart statefulset/solr -n solr --context <your-cluster>
+```
+
+Then wait for the rollout to complete before running the test:
+
+```zsh
+kubectl rollout status statefulset/solr -n solr --context <your-cluster>
+```
 
 ## Tips on analyzing the data
 
-* If you are comparing between two tests, the dashboard's median response time and percentiles can be useful metrics to compare.
-* The charts tend not to be very useful unless you are trying to see the impact of a particular event that happened _during_ your test (e.g. a cache gradually filled, or the solr box hit some resource limit)
+* If you are comparing between two tests, the dashboard's median response time and
+percentiles can be useful metrics to compare.
+* The charts tend not to be very useful unless you are trying to see the impact of a
+particular event that happened _during_ your test (e.g. a cache gradually filled, or the
+Solr instance hit some resource limit).
