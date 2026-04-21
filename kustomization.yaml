@@ -5,6 +5,7 @@ resources:
   - k8s/namespace.yaml
   - k8s/pvc.yaml
   - k8s/job.yaml
+  - k8s/external-secret.yaml
 
 configMapGenerator:
   - name: jmeter-keywords

@@ -10,22 +10,32 @@ spec:
       restartPolicy: Never
       containers:
         - name: jmeter
-          image: justb4/jmeter:5.6.3
+          image: ghcr.io/notch8/jmeter:5.6.3
+          command: ["/bin/sh", "-c"]
           args:
-            - "-n"
-            - "-t"
-            - "/test-plans/solr_test_plan.jmx"
-            - "-Jhost=solr.solr.svc.cluster.local"
-            - "-Jport=8983"
-            - "-Jsolr_core=4614dab5-cc11-45ca-8c87-8ac9f38ecc34"  # update per run if needed
-            - "-Jkeyword_file_full_path=/keywords/keywords.csv"
-            - "-Jkw_expected_result_count=0"
-            - "-Jsitemap_expected_result_count=0"
-            - "-e"
-            - "-l"
-            - "/results/test-report.jtl"
-            - "-o"
-            - "/results/html-report"
+            - |
+              TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+              jmeter \
+                -n \
+                -t /test-plans/solr_test_plan.jmx \
+                -Jhost=solr.solr.svc.cluster.local \
+                -Jport=8983 \
+                -Jsolr_core=4614dab5-cc11-45ca-8c87-8ac9f38ecc34 \
+                -Jkeyword_file_full_path=/keywords/keywords.csv \
+                -Jkw_expected_result_count=0 \
+                -Jsitemap_expected_result_count=0 \
+                -Jusername=admin \
+                "-Jpassword=${SOLR_PASSWORD}" \
+                -e \
+                -l /results/test-report-${TIMESTAMP}.jtl \
+                -o /results/html-report-${TIMESTAMP}
+              sleep 3600
+          env:
+            - name: SOLR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: solr-admin-credentials
+                  key: admin-password
           volumeMounts:
             - name: results
               mountPath: /results
@@ -33,6 +43,13 @@ spec:
               mountPath: /keywords
             - name: test-plans
               mountPath: /test-plans
+          resources:
+            requests:
+              memory: "2.5Gi"
+              cpu: "500m"
+            limits:
+              memory: "3Gi"
+              cpu: "1"
       volumes:
         - name: results
           persistentVolumeClaim:
