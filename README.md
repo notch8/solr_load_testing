@@ -96,3 +96,25 @@ percentiles can be useful metrics to compare.
 * The charts tend not to be very useful unless you are trying to see the impact of a
 particular event that happened _during_ your test (e.g. a cache gradually filled, or the
 Solr instance hit some resource limit).
+
+## Monitoring notes
+
+Port-forward Prometheus, if installed
+
+```bash
+kubectl port-forward svc/kube-prometheus-stack-prometheus -n monitoring 9090:9090
+```
+
+Go to prometheus in the browser http://localhost:9090/ and enter queries
+
+Examples:
+
+CPU
+```
+rate(container_cpu_usage_seconds_total{namespace="solr", container="solr"}[1m])
+```
+
+Memory
+```
+container_memory_working_set_bytes{namespace="solr", container="solr"}
+```
