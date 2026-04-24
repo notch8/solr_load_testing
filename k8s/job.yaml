@@ -20,7 +20,7 @@ spec:
                 -t /test-plans/solr_test_plan.jmx \
                 -Jhost=solr.solr.svc.cluster.local \
                 -Jport=8983 \
-                -Jsolr_core=4614dab5-cc11-45ca-8c87-8ac9f38ecc34 \
+                -Jsolr_core=56e0eb81-c2d5-4d5d-9171-b251bf7299a4 \
                 -Jkeyword_file_full_path=/keywords/keywords.csv \
                 -Jkw_expected_result_count=0 \
                 -Jsitemap_expected_result_count=0 \
