@@ -25,8 +25,7 @@ alongside Solr, eliminating network variance.
 
 ### Configuration
 
-The Job is configured to run against Solr at `solr.solr.svc.cluster.local:8983`. The only
-value likely to need changing between runs is `solr_core` in `k8s/job.yaml`.
+The Job is configured to run against Solr at `solr.solr.svc.cluster.local:8983`.
 
 ### Running a test
 
@@ -40,10 +39,10 @@ Once the Job completes, copy the results to your local machine:
 
 ```zsh
 RESULTS_POD=$(kubectl get pods -n load-testing --context <your-cluster> -l job-name=jmeter-solr-load-test -o jsonpath='{.items[0].metadata.name}')
-kubectl cp --context <your-cluster> -n load-testing ${RESULTS_POD}:/results ./results
+kubectl cp --context <your-cluster> -n load-testing ${RESULTS_POD}:/results ./test-results
 ```
 
-The `./results` directory will contain:
+The `./test-results` directory will contain:
 - `test-report.jtl` — raw results data
 - `html-report/` — open `html-report/index.html` in a browser to view the dashboard
 

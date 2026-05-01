@@ -12,6 +12,10 @@ configMapGenerator:
     namespace: load-testing
     files:
       - keywords.csv
+  - name: jmeter-cores
+    namespace: load-testing
+    files:
+      - cores.csv
   - name: jmeter-test-plans
     namespace: load-testing
     files:

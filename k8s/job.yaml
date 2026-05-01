@@ -20,7 +20,6 @@ spec:
                 -t /test-plans/solr_test_plan.jmx \
                 -Jhost=solr.solr.svc.cluster.local \
                 -Jport=8983 \
-                -Jsolr_core=56e0eb81-c2d5-4d5d-9171-b251bf7299a4 \
                 -Jkeyword_file_full_path=/keywords/keywords.csv \
                 -Jkw_expected_result_count=0 \
                 -Jsitemap_expected_result_count=0 \
@@ -41,6 +40,8 @@ spec:
               mountPath: /results
             - name: keywords
               mountPath: /keywords
+            - name: cores
+              mountPath: /cores
             - name: test-plans
               mountPath: /test-plans
           resources:
@@ -57,6 +58,9 @@ spec:
         - name: keywords
           configMap:
             name: jmeter-keywords
+        - name: cores
+          configMap:
+            name: jmeter-cores
         - name: test-plans
           configMap:
             name: jmeter-test-plans
